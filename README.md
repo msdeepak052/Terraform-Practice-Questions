@@ -98,4 +98,48 @@
 - Manage dependencies explicitly using `depends_on`  
 
 ### 10. Multiple AWS Profiles/Regions
-- Use provider aliasing for deployments across accounts or regions  
+- Use provider aliasing for deployments across accounts or regions
+
+
+## ➕ Additional Practice: Terraform Modules
+
+### 1. Module for EC2 with Custom Security Group
+- Create a reusable EC2 instance module.
+- Accept variables for AMI ID, instance type, and custom security group rules.
+- Output the instance ID and public IP.
+
+### 2. Nested Module Usage
+- Create a root module that uses a `vpc` module and an `ec2` module internally.
+- Pass outputs from the `vpc` module as inputs to the `ec2` module.
+
+### 3. Parameterize Resource Count in Module
+- Modify a module to support launching multiple EC2 instances using `count` or `for_each`.
+- Accept a list or map of instances with names and types.
+
+### 4. Write a Module for S3 Bucket Creation
+- Accept parameters for versioning, lifecycle rules, and bucket policy.
+- Output bucket name and ARN.
+
+### 5. Module with Conditional Logic
+- Add a variable to enable or disable the creation of a resource (e.g., NAT Gateway) inside the module.
+- Use `count` or `for_each` with conditions.
+
+### 6. Module for CloudWatch Alarms
+- Build a module that creates alarms for EC2 instance CPU utilization.
+- Accept threshold and alarm actions as variables.
+
+### 7. DRY Modules for Multi-Tier Architecture
+- Create a base `network` module used by frontend/backend/db modules.
+- Demonstrate reuse by deploying all 3 tiers in separate subnets with isolated security groups.
+
+### 8. Use of `locals` in Modules
+- Refactor your module to use `locals` for computed values like naming conventions or merged tags.
+
+### 9. Output Propagation from Modules
+- Capture module outputs in the root module and use them in another module.
+- Example: Output `subnet_id` from VPC module, use it in EC2 module.
+
+### 10. Use Public Modules (Terraform Registry or GitHub)
+- Integrate a public module (e.g., `terraform-aws-modules/vpc/aws`) into your setup.
+- Pass variables to customize its behavior for your environment.
+
