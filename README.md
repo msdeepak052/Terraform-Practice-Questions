@@ -852,11 +852,11 @@ output "azs" {
 
 ```
 ### Results
- '''hcl
-Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
 
-Outputs:
+### Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
 
+### Outputs:
+```hcl
 instance_azs = [
   "ap-south-1b",
   "ap-south-1b",
@@ -888,10 +888,13 @@ aws_instance.ec2[0]
 aws_instance.ec2[1]
 aws_instance.ec2[2]
 random_shuffle.az
-
-![image](https://github.com/user-attachments/assets/0e97795b-0454-49f9-9897-90f0a1f44c6f)
-
 ```
+![image](https://github.com/user-attachments/assets/067339e7-c848-4178-a743-4c7386060cf2)
+![image](https://github.com/user-attachments/assets/77e40bbd-ae7f-4fb8-ae0a-519280094195)
+![image](https://github.com/user-attachments/assets/be6e2fb9-7a6b-4673-842d-29990893910e)
+![image](https://github.com/user-attachments/assets/ec318494-2e7e-41b0-847a-ef6bb24313cc)
+
+
 
 
 ### 7. Terraform Formatting and Validation
