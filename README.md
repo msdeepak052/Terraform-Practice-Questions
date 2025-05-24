@@ -6,6 +6,147 @@
 - Create a Terraform script to launch one EC2 instance in AWS  
 - Use variables for AMI ID, instance type, and tags  
 
+## Answer
+
+# a. main.tf
+```hcl
+provider "aws" {
+
+  region = var.aws_region
+
+}
+
+resource "random_shuffle" "az" {
+  input        = data.aws_availability_zones.available.names
+  result_count = 1
+}
+
+
+
+resource "aws_instance" "ec2" {
+
+  ami                         = var.ami_id
+  availability_zone           = random_shuffle.az.result[0]
+  instance_type               = var.instance_type
+  key_name                    = var.key_name
+  subnet_id                   = local.subnets_in_random_az[0] # First match in random AZ
+  associate_public_ip_address = true
+
+  tags = merge(local.tags, {
+    Name = "ec2-instance"
+  })
+
+}
+```
+# b. variables.tf
+
+```hcl
+
+variable "aws_region" {
+  type        = string
+  description = "AWS Region"
+
+}
+
+variable "ami_id" {
+  type        = string
+  description = "ami_id"
+
+}
+
+variable "instance_type" {
+  type        = string
+  description = "instance type"
+
+}
+variable "key_name" {
+  type        = string
+  description = "Key Name"
+
+}
+
+```
+
+# c. terraform.tfvars
+
+```hcl
+
+aws_region    = "ap-south-1"
+ami_id        = "ami-0e35ddab05955cf57"
+instance_type = "t2.micro"
+key_name      = "lappynewawss"
+
+```
+
+# d. locals.tf
+
+```hcl
+locals {
+
+  azs = slice(data.aws_availability_zones.available.names, 0, 3)
+  subnets_in_random_az = [
+    for subnet_id in data.aws_subnets.selected.ids : subnet_id
+    if data.aws_subnet.subnet[subnet_id].availability_zone == random_shuffle.az.result[0]
+  ]
+  tags = {
+    Repo = "terraform-aws-vpc"
+    Org  = "terraform-aws-modules"
+  }
+}
+
+```
+
+# e. data_source.tf
+
+```hcl
+# Fetch existing VPC by tag
+data "aws_vpc" "selected" {
+  id = "vpc-0b4d8673f9549d276"
+}
+
+# Fetch subnet in the selected VPC
+data "aws_subnets" "selected" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.selected.id]
+  }
+}
+
+data "aws_subnet" "subnet" {
+  for_each = toset(data.aws_subnets.selected.ids)
+  id       = each.value
+}
+
+
+data "aws_availability_zones" "available" {}
+
+```
+# f. outouts.tf
+
+```hcl
+output "aws_instance" {
+  value = aws_instance.ec2.id
+}
+
+output "subnet" {
+  value = data.aws_subnets.selected.ids[0]
+}
+
+output "subnet" {
+  value = data.aws_subnets.selected.ids[0]
+}
+
+output "subnet_selected" {
+    value = data.aws_subnet.subnet.id
+  
+}
+
+output "azs" {
+  value = aws_instance.ec2.availability_zone
+}
+
+```
+
 ### 2. Create a VPC with a Public Subnet
 - Define a VPC with CIDR block `10.0.0.0/16`  
 - Add a public subnet, internet gateway, and route table  
