@@ -121,7 +121,7 @@ data "aws_subnet" "subnet" {
 data "aws_availability_zones" "available" {}
 
 ```
-# f. outouts.tf
+# f. outputs.tf
 
 ```hcl
 output "aws_instance" {
