@@ -132,10 +132,6 @@ output "subnet" {
   value = data.aws_subnets.selected.ids[0]
 }
 
-output "subnet" {
-  value = data.aws_subnets.selected.ids[0]
-}
-
 output "subnet_selected" {
     value = data.aws_subnet.subnet.id
   
@@ -713,7 +709,190 @@ output "sg" {
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ### 6. Destroy Specific Resources
-- Use `terraform destroy -target=aws_instance.example` to destroy the EC2 instance only  
+- Use `terraform destroy -target=aws_instance.example` to destroy the EC2 instance only
+- 
+## Answer
+
+### a. main.tf
+```hcl
+provider "aws" {
+
+  region = var.aws_region
+
+}
+
+resource "random_shuffle" "az" {
+  input        = data.aws_availability_zones.available.names
+  result_count = 1
+}
+
+
+
+resource "aws_instance" "ec2" {
+  count                       = 3
+  ami                         = var.ami_id
+  availability_zone           = random_shuffle.az.result[0]
+  instance_type               = var.instance_type
+  key_name                    = var.key_name
+  subnet_id                   = local.subnets_in_random_az[0] # First match in random AZ
+  associate_public_ip_address = true
+
+  tags = merge(local.tags, {
+    Name = "ec2-instance-${count.index+1}"
+  })
+
+}
+```
+### b. variables.tf
+
+```hcl
+
+variable "aws_region" {
+  type        = string
+  description = "AWS Region"
+
+}
+
+variable "ami_id" {
+  type        = string
+  description = "ami_id"
+
+}
+
+variable "instance_type" {
+  type        = string
+  description = "instance type"
+
+}
+variable "key_name" {
+  type        = string
+  description = "Key Name"
+
+}
+
+```
+
+### c. terraform.tfvars
+
+```hcl
+
+aws_region    = "ap-south-1"
+ami_id        = "ami-0e35ddab05955cf57"
+instance_type = "t2.micro"
+key_name      = "lappynewawss"
+
+```
+
+### d. locals.tf
+
+```hcl
+locals {
+
+  azs = slice(data.aws_availability_zones.available.names, 0, 3)
+  subnets_in_random_az = [
+    for subnet_id in data.aws_subnets.selected.ids : subnet_id
+    if data.aws_subnet.subnet[subnet_id].availability_zone == random_shuffle.az.result[0]
+  ]
+  tags = {
+    Repo = "terraform-aws-vpc"
+    Org  = "terraform-aws-modules"
+  }
+}
+
+```
+
+### e. data_source.tf
+
+```hcl
+# Fetch existing VPC by tag
+data "aws_vpc" "selected" {
+  id = "vpc-0b4d8673f9549d276"
+}
+
+# Fetch subnet in the selected VPC
+data "aws_subnets" "selected" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.selected.id]
+  }
+}
+
+data "aws_subnet" "subnet" {
+  for_each = toset(data.aws_subnets.selected.ids)
+  id       = each.value
+}
+
+
+data "aws_availability_zones" "available" {}
+
+```
+### f. outputs.tf
+
+```hcl
+output "aws_instance" {
+  value = aws_instance.ec2.id
+}
+
+output "subnet" {
+  value = data.aws_subnets.selected.ids[0]
+}
+
+output "subnet" {
+  value = data.aws_subnets.selected.ids[0]
+}
+
+output "subnet_selected" {
+    value = data.aws_subnet.subnet.id
+  
+}
+
+output "azs" {
+  value = aws_instance.ec2.availability_zone
+}
+
+```
+### Results
+ '''hcl
+Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+instance_azs = [
+  "ap-south-1b",
+  "ap-south-1b",
+  "ap-south-1b",
+]
+instance_ids = [
+  "i-00313ba73e8a0ada1",
+  "i-0dea2ceeb43eef1bf",
+  "i-0d35288d19db8eb3a",
+]
+instance_subnet_ids = [
+  "subnet-0d1e44b24dd3e9c69",
+  "subnet-0d1e44b24dd3e9c69",
+  "subnet-0d1e44b24dd3e9c69",
+]
+subnet_selected = [
+  "subnet-060a8e055c719c184",
+  "subnet-07d0f65b80ead8bb3",
+  "subnet-0d1e44b24dd3e9c69",
+]
+ubuntu@ip-172-31-13-230:~/ec2_instance_destroy_specific$ terraform state list
+data.aws_availability_zones.available
+data.aws_subnet.subnet["subnet-060a8e055c719c184"]
+data.aws_subnet.subnet["subnet-07d0f65b80ead8bb3"]
+data.aws_subnet.subnet["subnet-0d1e44b24dd3e9c69"]
+data.aws_subnets.selected
+data.aws_vpc.selected
+aws_instance.ec2[0]
+aws_instance.ec2[1]
+aws_instance.ec2[2]
+random_shuffle.az
+
+![image](https://github.com/user-attachments/assets/0e97795b-0454-49f9-9897-90f0a1f44c6f)
+
+```
+
 
 ### 7. Terraform Formatting and Validation
 - Run `terraform fmt`, `terraform validate`, and `terraform plan` as part of workflow
