@@ -1,14 +1,14 @@
 # Terraform-Practice-Questions
 
-## ✅ Beginner-Level Terraform Scenarios
+# ✅ Beginner-Level Terraform Scenarios
 
-### 1. Provision a Single EC2 Instance
+# 1. Provision a Single EC2 Instance
 - Create a Terraform script to launch one EC2 instance in AWS  
 - Use variables for AMI ID, instance type, and tags  
 
 ## Answer
 
-# a. main.tf
+### a. main.tf
 ```hcl
 provider "aws" {
 
@@ -38,7 +38,7 @@ resource "aws_instance" "ec2" {
 
 }
 ```
-# b. variables.tf
+### b. variables.tf
 
 ```hcl
 
@@ -67,7 +67,7 @@ variable "key_name" {
 
 ```
 
-# c. terraform.tfvars
+### c. terraform.tfvars
 
 ```hcl
 
@@ -78,7 +78,7 @@ key_name      = "lappynewawss"
 
 ```
 
-# d. locals.tf
+### d. locals.tf
 
 ```hcl
 locals {
@@ -96,7 +96,7 @@ locals {
 
 ```
 
-# e. data_source.tf
+### e. data_source.tf
 
 ```hcl
 # Fetch existing VPC by tag
@@ -121,7 +121,7 @@ data "aws_subnet" "subnet" {
 data "aws_availability_zones" "available" {}
 
 ```
-# f. outputs.tf
+### f. outputs.tf
 
 ```hcl
 output "aws_instance" {
@@ -147,13 +147,13 @@ output "azs" {
 
 ```
 
-### Bonus Tip
+# Bonus Tip
 
 ## 🔀 random_shuffle
-# 🔹 Purpose:
+### 🔹 Purpose:
 It randomly reorders items in a list and lets you use the result.
 
-# ✅ Example: Randomly select an Availability Zone
+### ✅ Example: Randomly select an Availability Zone
 
 ```hcl
 
@@ -167,7 +167,7 @@ resource "random_shuffle" "az" {
 }
 
 ```
-## 🔸 Output:
+### 🔸 Output:
 If available.names = ["ap-south-1a", "ap-south-1b", "ap-south-1c"], the result could be:
 
 ```h
@@ -180,11 +180,11 @@ random_shuffle.az.result[0] = "ap-south-1b"
 availability_zone = random_shuffle.az.result[0]
 ```
 
-## 🐶 random_pet
-# 🔹 Purpose:
+# 🐶 random_pet
+### 🔹 Purpose:
 It generates a human-readable random name, e.g., playful-lion or awesome-dog.
 
-# ✅ Example: Random EC2 Name
+## ✅ Example: Random EC2 Name
 ```hcl
 
 resource "random_pet" "ec2_name" {
@@ -192,12 +192,12 @@ resource "random_pet" "ec2_name" {
   separator = "-"
 }
 ```
-# 🔸 Output:
+### 🔸 Output:
 ```hcl
 
 random_pet.ec2_name.id = "happy-tiger"
 ```
-# Use it like:
+### Use it like:
 
 ``` h
 
@@ -211,14 +211,14 @@ resource "aws_instance" "example" {
 }
 ```
 ## 🔁 When to Use Each
-# Resource	                 Use When You Want To...
+### Resource	                 Use When You Want To...
 random_shuffle	             Pick one or more random elements from a list
 random_pet	                 Generate a fun and unique name for resources
 
 
 ## ✅ Randomly pick an AZ and subnet, and give the EC2 a fun random name
 
-# 🧩 Use Case:
+### 🧩 Use Case:
 - You have a VPC with subnets across multiple AZs.
 
 - You want to deploy a single EC2 instance:
@@ -230,7 +230,7 @@ random_pet	                 Generate a fun and unique name for resources
 - Tagged with a random, readable name
 
 ## ✅ Full Terraform Example
-# a. main.tf
+### a. main.tf
 ```hcl
 
 provider "aws" {
@@ -297,7 +297,7 @@ resource "aws_instance" "example" {
   }
 }
 ```
-# b. variables.tf
+### b. variables.tf
 ```hcl
 
 variable "ami_id" {
@@ -315,14 +315,14 @@ variable "key_name" {
   type        = string
 }
 ```
-# c.terraform.tfvars
+### c.terraform.tfvars
 ```hcl
 
 ami_id      = "ami-0abcdef1234567890"
 key_name    = "my-keypair"
 
 ```
-## 🔍 What This Does:
+### 🔍 What This Does:
 - Picks a random AZ from the region
 
 - Filters subnets in your VPC that belong to that AZ
@@ -330,6 +330,10 @@ key_name    = "my-keypair"
 - Launches the EC2 in one of those subnets
 
 - Gives it a fun tag like "happy-koala"
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ### 2. Create a VPC with a Public Subnet
 - Define a VPC with CIDR block `10.0.0.0/16`  
