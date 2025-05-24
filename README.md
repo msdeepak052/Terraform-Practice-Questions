@@ -495,12 +495,93 @@ output "igw-id" {
 
 ```
 
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ### 3. Use Input Variables
-- Parameterize values like VPC name, CIDR, and subnet CIDR  
+- Parameterize values like VPC name, CIDR, and subnet CIDR 
+
+### Already followed  in Q1 & Q2 
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ### 4. Define and Use Output Variables
-- Output the instance ID and public IP of the EC2 instance  
+- Output the instance ID and public IP of the EC2 instance
+
+ ### a.main.tf
+
+ ```hcl
+provider "aws" {
+  region = var.aws_region
+}
+
+resource "aws_instance" "example" {
+  ami           = var.ami_id
+  instance_type = var.instance_type
+  key_name      = var.key_name
+
+  tags = {
+    Name = "MyEC2Instance"
+  }
+}
+
+```
+
+### b.variables.tf
+
+```hcl
+variable "aws_region" {
+  description = "The AWS region to deploy into"
+  type        = string
+}
+
+variable "ami_id" {
+  description = "Amazon Machine Image ID"
+  type        = string
+}
+
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+}
+
+variable "key_name" {
+  description = "EC2 key pair name"
+  type        = string
+}
+
+```
+
+### c.terraform.tfvars
+
+```hcl
+aws_region     = "ap-south-1"
+ami_id         = "ami-0e35ddab05955cf57"
+instance_type  = "t2.micro"
+key_name       = "lappynewawss"
+```
+
+### d. outputs.tf
+
+```hcl
+output "instance_public_ip" {
+  value = aws_instance.example.public_ip
+}
+
+output "instance_id" {
+  value = aws_instance.example.id
+}
+
+```
+
+### Ouput from Terraform
+```hcl
+Outputs:
+
+ec2-instance-id = "i-0b2f3397b10417de0"
+ec2-instance-pub-ip = "13.201.22.20"
+```
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ### 5. Create a Simple Security Group
 - Allow SSH (port 22) and HTTP (port 80) from any IP  
