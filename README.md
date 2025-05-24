@@ -147,6 +147,190 @@ output "azs" {
 
 ```
 
+### Bonus Tip
+
+## 🔀 random_shuffle
+# 🔹 Purpose:
+It randomly reorders items in a list and lets you use the result.
+
+# ✅ Example: Randomly select an Availability Zone
+
+```hcl
+
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+resource "random_shuffle" "az" {
+  input        = data.aws_availability_zones.available.names
+  result_count = 1
+}
+
+```
+## 🔸 Output:
+If available.names = ["ap-south-1a", "ap-south-1b", "ap-south-1c"], the result could be:
+
+```h
+random_shuffle.az.result[0] = "ap-south-1b"
+```
+# You can then use it like:
+
+``` hcl
+
+availability_zone = random_shuffle.az.result[0]
+```
+
+## 🐶 random_pet
+# 🔹 Purpose:
+It generates a human-readable random name, e.g., playful-lion or awesome-dog.
+
+# ✅ Example: Random EC2 Name
+```hcl
+
+resource "random_pet" "ec2_name" {
+  length    = 2
+  separator = "-"
+}
+```
+# 🔸 Output:
+```hcl
+
+random_pet.ec2_name.id = "happy-tiger"
+```
+# Use it like:
+
+``` h
+
+resource "aws_instance" "example" {
+  ami           = var.ami_id
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = random_pet.ec2_name.id
+  }
+}
+```
+## 🔁 When to Use Each
+# Resource	                 Use When You Want To...
+random_shuffle	             Pick one or more random elements from a list
+random_pet	                 Generate a fun and unique name for resources
+
+
+## ✅ Randomly pick an AZ and subnet, and give the EC2 a fun random name
+
+# 🧩 Use Case:
+- You have a VPC with subnets across multiple AZs.
+
+- You want to deploy a single EC2 instance:
+
+- In a random AZ
+
+- With a subnet in that AZ
+
+- Tagged with a random, readable name
+
+## ✅ Full Terraform Example
+# a. main.tf
+```hcl
+
+provider "aws" {
+  region = "ap-south-1"
+}
+
+# Get available AZs in the region
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+# Shuffle AZs and pick one
+resource "random_shuffle" "az" {
+  input        = data.aws_availability_zones.available.names
+  result_count = 1
+}
+
+# Get a specific VPC by name
+data "aws_vpc" "selected" {
+  filter {
+    name   = "tag:Name"
+    values = ["my-vpc"]
+  }
+}
+
+# Get subnets in the VPC
+data "aws_subnets" "selected" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.selected.id]
+  }
+}
+
+# Get AZ info for each subnet
+data "aws_subnet" "details" {
+  for_each = toset(data.aws_subnets.selected.ids)
+  id       = each.key
+}
+
+# Get subnets only in the random AZ
+locals {
+  subnets_in_random_az = [
+    for id, subnet in data.aws_subnet.details : id
+    if subnet.availability_zone == random_shuffle.az.result[0]
+  ]
+}
+
+# Generate a fun EC2 name
+resource "random_pet" "ec2_name" {
+  length    = 2
+  separator = "-"
+}
+
+# Create EC2 instance in random AZ with fun name
+resource "aws_instance" "example" {
+  ami           = var.ami_id
+  instance_type = var.instance_type
+  subnet_id     = local.subnets_in_random_az[0]
+  availability_zone = random_shuffle.az.result[0]
+  key_name      = var.key_name
+
+  tags = {
+    Name = random_pet.ec2_name.id
+  }
+}
+```
+# b. variables.tf
+```hcl
+
+variable "ami_id" {
+  description = "AMI ID for EC2"
+  type        = string
+}
+
+variable "instance_type" {
+  default     = "t2.micro"
+  description = "Instance type"
+}
+
+variable "key_name" {
+  description = "Key pair name"
+  type        = string
+}
+```
+# c.terraform.tfvars
+```hcl
+
+ami_id      = "ami-0abcdef1234567890"
+key_name    = "my-keypair"
+
+```
+## 🔍 What This Does:
+- Picks a random AZ from the region
+
+- Filters subnets in your VPC that belong to that AZ
+
+- Launches the EC2 in one of those subnets
+
+- Gives it a fun tag like "happy-koala"
+
 ### 2. Create a VPC with a Public Subnet
 - Define a VPC with CIDR block `10.0.0.0/16`  
 - Add a public subnet, internet gateway, and route table  
