@@ -332,12 +332,169 @@ key_name    = "my-keypair"
 - Gives it a fun tag like "happy-koala"
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 
 ### 2. Create a VPC with a Public Subnet
 - Define a VPC with CIDR block `10.0.0.0/16`  
 - Add a public subnet, internet gateway, and route table  
+
+### a. main.tf
+
+```hcl
+
+provider "aws" {
+
+  region = var.aws_region
+
+}
+
+resource "aws_vpc" "deepak-vpc" {
+  cidr_block           = var.cidr_block
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+  tags = {
+    Name = "deepak-vpc"
+  }
+}
+
+# resource "aws_subnet" "public_subnet" {
+#   vpc_id = aws_vpc.deepak-vpc.id
+#   cidr_block = [var.public_subnets]
+#   map_public_ip_on_launch = true
+
+# }
+
+resource "aws_subnet" "public_subnet" {
+  for_each = { for subnet in var.subnets : subnet.name => subnet }
+
+  vpc_id                  = aws_vpc.deepak-vpc.id
+  cidr_block              = each.value.cidr
+  availability_zone       = each.value.az
+  map_public_ip_on_launch = can(regex("public", each.key))
+
+  tags = {
+    Name = each.key
+  }
+
+}
+
+resource "aws_internet_gateway" "igw-main" {
+  vpc_id = aws_vpc.deepak-vpc.id
+
+  tags = {
+    Name = "igw-main"
+  }
+}
+
+resource "aws_route_table" "public-rt" {
+  vpc_id = aws_vpc.deepak-vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw-main.id
+  }
+  tags = {
+    Name = "public-rt"
+  }
+}
+
+resource "aws_route_table_association" "public-rt-association" {
+  for_each = {
+    for subnet in var.subnets : subnet.name => subnet
+    if can(regex("public", subnet.name))
+  }
+
+  subnet_id      = aws_subnet.public_subnet[each.key].id
+  route_table_id = aws_route_table.public-rt.id
+
+}
+
+```
+
+### b. variables.tf
+
+```hcl
+variable "aws_region" {
+  type        = string
+  description = "AWS Region"
+
+}
+
+variable "cidr_block" {
+  type        = string
+  description = "cidr_block"
+
+}
+
+# variable "public_subnets" {
+#   type        = list(string)
+#   description = "public_subnets"
+
+# }
+
+variable "subnets" {
+  type = list(object({
+    name = string
+    cidr = string
+    az   = string
+  }))
+  description = "List of subnets to create"
+}
+```
+### c. terraform.tfvars
+
+```hcl
+
+aws_region = "ap-south-1"
+cidr_block = "10.0.0.0/16"
+# public_subnets = ["10.0.0.0/24","10.0.1.0/24"]
+
+subnets = [
+  {
+    name = "subnet-public-1"
+    cidr = "10.0.1.0/24"
+    az   = "ap-south-1a"
+  },
+  {
+    name = "subnet-public-2"
+    cidr = "10.0.2.0/24"
+    az   = "ap-south-1b"
+  },
+  {
+    name = "subnet-private-1"
+    cidr = "10.0.101.0/24"
+    az   = "ap-south-1a"
+  },
+  {
+    name = "subnet-private-2"
+    cidr = "10.0.102.0/24"
+    az   = "ap-south-1b"
+  }
+]
+
+```
+
+### d. outputs.tf
+
+```hcl
+
+output "aws_vpc" {
+  value = aws_vpc.deepak-vpc.id
+}
+
+output "public_subnets" {
+  value = [
+    for name, subnet in aws_subnet.public_subnet : subnet.id
+    if can(regex("public", name))
+  ]
+}
+
+output "igw-id" {
+  value = aws_internet_gateway.igw-main.id
+}
+
+```
+
 
 ### 3. Use Input Variables
 - Parameterize values like VPC name, CIDR, and subnet CIDR  
