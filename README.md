@@ -420,7 +420,7 @@ output "subnets" {
 }
 
 ```
-**━━━━━━━━━━---------------------------------------------------------------------------------------━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━**
+<hr style="height:2px; border-width:0; color:black; background-color:black">
 
 ### 2. Deploy EC2 Instances in Private Subnet with NAT Gateway
 - Create private subnet and NAT Gateway in a public subnet  
