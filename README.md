@@ -1003,6 +1003,244 @@ instance_type = "t2.micro"
 
 
 ```
+
+### Bonus
+
+###  dynamically create EC2 instances based on requirements by making these improvements:
+#### 1. Enhanced Variable Structure (in variables.tf)
+```hcl
+
+variable "ec2_instances" {
+  description = "Map of EC2 instances to create"
+  type = map(object({
+    ami_id        = string
+    instance_type = string
+    subnet_type   = string # "private" or "public"
+    extra_sgs     = list(string) # Additional security groups
+    user_data     = string # Optional startup scripts
+  }))
+  default = {
+    web-server = {
+      ami_id        = "ami-123456"
+      instance_type = "t3.medium"
+      subnet_type   = "private"
+      extra_sgs     = []
+      user_data     = ""
+    }
+  }
+}
+```
+#### 2. Dynamic EC2 Creation (in main.tf)
+```hcl
+
+module "ec2-instances" {
+  source = "./modules/ec2"
+  
+  for_each = {
+    for name, config in var.ec2_instances : 
+    name => merge(config, {
+      subnet_id = config.subnet_type == "private" ? 
+        element(values(module.nat-deepak-vpc.private_subnet_ids), 0) : # First private subnet
+        element(values(module.nat-deepak-vpc.public_subnet_ids), 0)   # First public subnet
+    })
+  }
+
+  ami_id        = each.value.ami_id
+  instance_type = each.value.instance_type
+  subnet_id     = each.value.subnet_id
+  ec2_sg        = concat([module.nat-deepak-vpc.sg_id], each.value.extra_sgs)
+  user_data     = each.value.user_data
+  
+  tags = merge(local.common_tags, {
+    Name = "${each.key}-${each.value.subnet_type}"
+  })
+}
+```
+
+#### 3. Enhanced EC2 Module (modules/ec2/main.tf)
+```hcl
+
+resource "aws_instance" "dynamic-ec2" {
+  ami           = var.ami_id
+  instance_type = var.instance_type
+  subnet_id     = var.subnet_id
+  vpc_security_group_ids = var.ec2_sg
+  user_data     = var.user_data
+  key_name      = "newawss"
+
+  tags = var.tags
+}
+
+```
+
+#### 4. Usage Example (terraform.tfvars)
+```hcl
+
+ec2_instances = {
+  web-server = {
+    ami_id        = "ami-0c55b159cbfafe1f0"
+    instance_type = "t3.micro"
+    subnet_type   = "private"
+  },
+  bastion-host = {
+    ami_id        = "ami-0c55b159cbfafe1f0"
+    instance_type = "t2.small"
+    subnet_type   = "public"
+    extra_sgs     = ["sg-12345678"]
+  }
+}
+```
+### Advanced Version (Multiple AZ Placement):
+```hcl
+
+module "ec2-instances" {
+  source = "./modules/ec2"
+  
+  for_each = var.ec2_instances
+
+  ami_id        = each.value.ami_id
+  instance_type = each.value.instance_type
+  subnet_id     = each.value.subnet_type == "private" ? 
+    module.nat-deepak-vpc.private_subnet_ids[keys(module.nat-deepak-vpc.private_subnet_ids)[each.value.az_index % length(module.nat-deepak-vpc.private_subnet_ids)]] :
+    module.nat-deepak-vpc.public_subnet_ids[keys(module.nat-deepak-vpc.public_subnet_ids)[each.value.az_index % length(module.nat-deepak-vpc.public_subnet_ids)]]
+    
+  ec2_sg        = concat([module.nat-deepak-vpc.sg_id], each.value.extra_sgs)
+  
+  tags = merge(local.common_tags, {
+    Name = "${each.key}-${each.value.subnet_type}"
+  })
+}
+
+Would you like me to focus on any particular aspect of this dynamic approach?
+for_each = {
+    for name, config in var.ec2_instances : 
+    name => merge(config, {
+      subnet_id = config.subnet_type == "private" ? 
+        element(values(module.nat-deepak-vpc.private_subnet_ids), 0) : # First private subnet
+        element(values(module.nat-deepak-vpc.public_subnet_ids), 0)   # First public subnet
+    })
+  }
+```
+
+#### Assume we have:
+
+#### VPC Outputs:
+```hcl
+module.nat-deepak-vpc.private_subnet_ids = {
+  "private-subnet-1" = "subnet-111111"
+  "private-subnet-2" = "subnet-222222"
+}
+
+module.nat-deepak-vpc.public_subnet_ids = {
+  "public-subnet-1" = "subnet-333333"
+  "public-subnet-2" = "subnet-444444"
+}
+```
+
+#### Input Variable (terraform.tfvars):
+```hcl
+
+    ec2_instances = {
+      web-server = {
+        ami_id        = "ami-123456"
+        instance_type = "t3.medium"
+        subnet_type   = "private"
+      },
+      bastion-host = {
+        ami_id        = "ami-789012"
+        instance_type = "t2.small"
+        subnet_type   = "public"
+      }
+    }
+```
+
+#### The for_each Logic Explained
+```hcl
+
+for_each = {
+  for name, config in var.ec2_instances : 
+  name => merge(config, {
+    subnet_id = config.subnet_type == "private" ? 
+      element(values(module.nat-deepak-vpc.private_subnet_ids), 0) : 
+      element(values(module.nat-deepak-vpc.public_subnet_ids), 0)
+  })
+}
+```
+#### Step-by-Step Transformation:
+#### Original Input:
+```json
+
+{
+  "web-server" = { ami_id = "ami-123456", instance_type = "t3.medium", subnet_type = "private" }
+  "bastion-host" = { ami_id = "ami-789012", instance_type = "t2.small", subnet_type = "public" }
+}
+
+```
+
+#### After Processing:
+```json
+
+    {
+      "web-server" = {
+        ami_id = "ami-123456",
+        instance_type = "t3.medium",
+        subnet_type = "private",
+        subnet_id = "subnet-111111"  # First private subnet
+      },
+      "bastion-host" = {
+        ami_id = "ami-789012",
+        instance_type = "t2.small",
+        subnet_type = "public",
+        subnet_id = "subnet-333333"  # First public subnet
+      }
+    }
+```
+#### Key Components:
+
+#### for name, config in var.ec2_instances:
+
+- Iterates through each instance in the ec2_instances map
+- name = key ("web-server", "bastion-host")
+- config = value (the object containing ami_id, etc.)
+- merge(config, { subnet_id = ... }):
+    - Takes the original config
+    - Adds a new subnet_id field
+
+#### Ternary Condition:
+```hcl
+
+    config.subnet_type == "private" ? 
+      element(values(module.nat-deepak-vpc.private_subnet_ids), 0) : 
+      element(values(module.nat-deepak-vpc.public_subnet_ids), 0)
+```
+#### Checks subnet_type
+- If private: Takes first value from private subnets (subnet-111111)
+- If public: Takes first value from public subnets (subnet-333333)
+##### element(values(...), 0):
+- values() extracts just the subnet IDs (ignores the keys)
+- element(..., 0) takes the first one (index 0)
+
+#### Resulting EC2 Instances:
+
+    - web-server:
+
+        - Placed in first private subnet (subnet-111111)
+
+        - Gets all original config plus the computed subnet_id
+
+    - bastion-host:
+
+        - Placed in first public subnet (subnet-333333)
+
+        - Gets all original config plus the computed subnet_id
+
+#### Why This Is Powerful:
+
+    - Dynamic Placement: Automatically chooses correct subnet type
+
+    - Clean Configuration: Keeps subnet selection logic separate from instance definitions
+
+    - Flexible: Easy to add more instances just by adding to ec2_instances map
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
