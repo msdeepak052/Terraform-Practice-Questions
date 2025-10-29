@@ -73,7 +73,7 @@ variable "key_name" {
 
 aws_region    = "ap-south-1"
 ami_id        = "ami-0e35ddab05955cf57"
-instance_type = "t2.micro"
+instance_type = "t3.micro"
 key_name      = "lappynewawss"
 
 ```
@@ -128,18 +128,18 @@ output "aws_instance" {
   value = aws_instance.ec2.id
 }
 
-output "subnet" {
-  value = data.aws_subnets.selected.ids[0]
+output "subnet_selected" {
+  value = { for k, v in data.aws_subnet.subnet : k => v }
 }
 
-output "subnet_selected" {
-    value = data.aws_subnet.subnet.id
-  
+output "all_subnets" {
+  value = data.aws_subnets.selected.ids
 }
 
 output "azs" {
   value = aws_instance.ec2.availability_zone
 }
+
 
 ```
 
