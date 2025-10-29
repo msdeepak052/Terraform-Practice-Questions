@@ -1246,7 +1246,230 @@ for_each = {
 
 ### 3. Use Remote State with S3 and DynamoDB
 - Store Terraform state in S3  
-- Use DynamoDB for state locking  
+- Use DynamoDB for state locking
+
+
+> Let’s go through the **full, detailed steps** — both the **old way** (S3 + DynamoDB) and the **new 2025 way** (S3 native locking) — from start to finish, including setup via **AWS Console** and **Terraform**.
+
+---
+
+# 🧱 PART 1 — OLD WAY (S3 + DynamoDB Locking)
+
+*(Traditional setup — before Terraform 1.10)*
+
+---
+
+## 🪣 Step 1 — Create S3 Bucket (for State Storage)
+
+### 🔹 AWS Console:
+
+1. Go to **S3 → Create bucket**
+2. Name it something like:
+   `deepak-terraform-state`
+3. Choose region:
+   `ap-south-1`
+4. **Disable public access**
+5. Enable **Bucket Versioning** → ✅ (important for state recovery)
+6. Click **Create bucket**
+
+### 🔹 Terraform equivalent:
+
+```hcl
+resource "aws_s3_bucket" "tf_state" {
+  bucket = "deepak-terraform-state"
+}
+
+resource "aws_s3_bucket_versioning" "tf_state_versioning" {
+  bucket = aws_s3_bucket.tf_state.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+```
+
+---
+
+## 🔒 Step 2 — Create DynamoDB Table (for Locking)
+
+### 🔹 AWS Console:
+
+1. Go to **DynamoDB → Create table**
+2. Table name → `terraform-locks`
+3. Partition key → `LockID` (String)
+4. Leave everything else default
+5. Create table
+
+### 🔹 Terraform equivalent:
+
+```hcl
+resource "aws_dynamodb_table" "tf_locks" {
+  name         = "terraform-locks"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "LockID"
+
+  attribute {
+    name = "LockID"
+    type = "S"
+  }
+}
+```
+
+---
+
+## ⚙️ Step 3 — Configure Terraform Backend
+
+In your **main Terraform project**, add:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "deepak-terraform-state"
+    key            = "vpc/terraform.tfstate"
+    region         = "ap-south-1"
+    encrypt        = true
+    dynamodb_table = "terraform-locks"
+  }
+}
+
+provider "aws" {
+  region = "ap-south-1"
+}
+```
+
+---
+
+## 🧩 Step 4 — Initialize Backend
+
+```bash
+terraform init
+```
+
+You’ll see:
+
+```
+Initializing the backend...
+Successfully configured the backend "s3"!
+```
+
+---
+
+## 🧠 Step 5 — Verification
+
+* Check your S3 bucket — you’ll see a `vpc/terraform.tfstate` file.
+* Check DynamoDB — you’ll see a `LockID` entry appear when running `terraform apply`.
+
+---
+
+✅ Done! That’s the **old, standard setup**.
+
+---
+
+# ⚙️ PART 2 — NEW WAY (2025 Onward)
+
+*(S3 Native Locking — No DynamoDB required)*
+
+Introduced in **Terraform v1.10+**
+✅ Simpler, cost-effective, and modern.
+
+---
+
+## 🪣 Step 1 — Create S3 Bucket (same as before)
+
+### 🔹 AWS Console:
+
+1. Go to **S3 → Create bucket**
+2. Name → `deepak-terraform-state`
+3. Region → `ap-south-1`
+4. Disable public access
+5. Enable **versioning**
+6. Create
+
+### 🔹 Terraform equivalent:
+
+```hcl
+resource "aws_s3_bucket" "tf_state" {
+  bucket = "deepak-terraform-state"
+}
+
+resource "aws_s3_bucket_versioning" "tf_state_versioning" {
+  bucket = aws_s3_bucket.tf_state.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+```
+
+---
+
+## 🧰 Step 2 — Configure Terraform Backend (with native locking)
+
+### `main.tf`
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket       = "deepak-terraform-state"
+    key          = "vpc/terraform.tfstate"
+    region       = "ap-south-1"
+    encrypt      = true
+    use_lockfile = true   # ✅ NEW PARAMETER (no DynamoDB)
+  }
+}
+
+provider "aws" {
+  region = "ap-south-1"
+}
+```
+
+> ⚠️ Make sure Terraform CLI version ≥ 1.10
+
+---
+
+## 🧩 Step 3 — Initialize Backend
+
+```bash
+terraform init -reconfigure
+```
+
+You’ll see something like:
+
+```
+Initializing the backend...
+Backend configured with native S3 locking.
+```
+
+---
+
+## 🧠 Step 4 — Verification
+
+* Check S3 → You’ll find `.terraform.tfstate` and also temporary **lock files** that Terraform uses internally during `apply`.
+* No DynamoDB required.
+
+---
+
+## 🧹 Step 5 — Clean Up (if you migrated)
+
+If you previously had DynamoDB locks:
+
+```bash
+aws dynamodb delete-table --table-name terraform-locks
+```
+
+---
+
+# 🧾 Comparison Summary
+
+| Feature             | Old Way (S3 + DynamoDB) | New Way (S3 Native Locking)               |
+| ------------------- | ----------------------- | ----------------------------------------- |
+| State storage       | S3 bucket               | S3 bucket                                 |
+| Locking mechanism   | DynamoDB table          | Native S3 locking (`use_lockfile = true`) |
+| CLI version         | Any (0.12+)             | v1.10+                                    |
+| IAM permissions     | S3 + DynamoDB           | S3 only                                   |
+| Setup complexity    | Moderate                | Simple                                    |
+| Cost                | Slight DynamoDB cost    | Only S3 cost                              |
+| Recommended in 2025 | ❌ Legacy                | ✅ Modern Standard                         |
+
+---
 
 ### 4. Use Workspaces for Environment Isolation
 - Create `dev`, `staging`, and `prod` workspaces  
