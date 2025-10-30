@@ -1952,6 +1952,7 @@ Each destroys **only** its environment’s resources.
 # ✅ SUMMARY TABLE
 
 | Environment | Workspace | tfvars file | State file path | S3 Object |
+
 |--------------|------------|--------------|------------------|
 | Dev | `dev` | `dev.tfvars` | `env:/dev/terraform.tfstate` | ✅ Created |
 | Staging | `staging` | `staging.tfvars` | `env:/staging/terraform.tfstate` | ✅ Created |
