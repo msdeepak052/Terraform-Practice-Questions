@@ -1925,6 +1925,9 @@ staging-workspace-demo-yyyy
 prod-workspace-demo-zzzz
 ```
 
+<img width="1508" height="614" alt="image" src="https://github.com/user-attachments/assets/c189e5b0-fcbf-4246-bdc7-4eb6492e9b19" />
+
+
 Each environment’s state file is isolated within its own S3 folder (Terraform handles this automatically).
 
 ---
