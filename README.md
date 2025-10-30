@@ -1714,7 +1714,265 @@ terraform destroy -auto-approve
 
 ### 4. Use Workspaces for Environment Isolation
 - Create `dev`, `staging`, and `prod` workspaces  
-- Use different `terraform.tfvars` files per workspace  
+- Use different `terraform.tfvars` files per workspace
+
+
+> Let’s go through it **step-by-step from start to end**, including **workspace creation**, **state isolation**, and **tfvars usage**.
+
+---
+
+# 🎯 GOAL
+
+Use **Terraform Workspaces** to create:
+
+* `dev`
+* `staging`
+* `prod`
+
+Each will:
+
+* Have its own isolated **Terraform state** file (same backend)
+* Use a separate **terraform.tfvars** file (environment-specific values)
+
+---
+
+# ⚙️ STEP 1 — Setup Folder & Base Files
+
+Create a directory:
+
+```bash
+mkdir terraform-workspace-demo
+cd terraform-workspace-demo
+```
+
+Create these 3 files:
+
+```
+main.tf
+variables.tf
+terraform.tfvars (optional default)
+```
+
+---
+
+# 🧩 STEP 2 — main.tf
+
+Example — Create one S3 bucket per environment:
+
+```hcl
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+
+  backend "s3" {
+    bucket = "deepak-terraform-state"
+    key    = "workspace-demo/terraform.tfstate"
+    region = "ap-south-1"
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+
+resource "aws_s3_bucket" "demo_bucket" {
+  bucket = "${var.env_name}-workspace-demo-${random_id.suffix.hex}"
+
+  tags = {
+    Environment = var.env_name
+  }
+}
+
+resource "random_id" "suffix" {
+  byte_length = 2
+}
+
+output "bucket_name" {
+  value = aws_s3_bucket.demo_bucket.bucket
+}
+```
+
+---
+
+# 🧩 STEP 3 — variables.tf
+
+```hcl
+variable "aws_region" {
+  description = "AWS region to use"
+  type        = string
+}
+
+variable "env_name" {
+  description = "Environment name (dev/staging/prod)"
+  type        = string
+}
+```
+
+---
+
+# 🧩 STEP 4 — Create Environment tfvars files
+
+We’ll use **different terraform.tfvars files** for each workspace.
+
+### `dev.tfvars`
+
+```hcl
+aws_region = "ap-south-1"
+env_name   = "dev"
+```
+
+### `staging.tfvars`
+
+```hcl
+aws_region = "ap-south-1"
+env_name   = "staging"
+```
+
+### `prod.tfvars`
+
+```hcl
+aws_region = "ap-south-1"
+env_name   = "prod"
+```
+
+---
+
+# 🧩 STEP 5 — Initialize Terraform
+
+```bash
+terraform init
+```
+
+✅ This sets up the S3 backend (shared, but Terraform will auto-create workspace-specific folders in it).
+
+---
+
+# 🧩 STEP 6 — Create Workspaces
+
+```bash
+terraform workspace new dev
+terraform workspace new staging
+terraform workspace new prod
+```
+
+Check all:
+
+```bash
+terraform workspace list
+```
+
+✅ Output:
+
+```
+  default
+* dev
+  staging
+  prod
+```
+
+---
+
+# 🧩 STEP 7 — Apply per Environment
+
+### For Dev:
+
+```bash
+terraform workspace select dev
+terraform apply -var-file="dev.tfvars" -auto-approve
+```
+
+✅ State stored at:
+`s3://deepak-terraform-state/workspace-demo/env:/dev/terraform.tfstate`
+
+---
+
+### For Staging:
+
+```bash
+terraform workspace select staging
+terraform apply -var-file="staging.tfvars" -auto-approve
+```
+
+✅ State stored at:
+`s3://deepak-terraform-state/workspace-demo/env:/staging/terraform.tfstate`
+
+---
+
+### For Prod:
+
+```bash
+terraform workspace select prod
+terraform apply -var-file="prod.tfvars" -auto-approve
+```
+
+✅ State stored at:
+`s3://deepak-terraform-state/workspace-demo/env:/prod/terraform.tfstate`
+
+---
+
+# 🧪 STEP 8 — Verify Isolation
+
+List buckets in AWS console:
+You’ll see **3 distinct buckets**:
+
+```
+dev-workspace-demo-xxxx
+staging-workspace-demo-yyyy
+prod-workspace-demo-zzzz
+```
+
+Each environment’s state file is isolated within its own S3 folder (Terraform handles this automatically).
+
+---
+
+# 🧠 STEP 9 — Modify & Destroy
+
+Switch environments easily:
+
+```bash
+terraform workspace select dev
+terraform destroy -var-file="dev.tfvars" -auto-approve
+```
+
+Then switch to another:
+
+```bash
+terraform workspace select prod
+terraform destroy -var-file="prod.tfvars" -auto-approve
+```
+
+Each destroys **only** its environment’s resources.
+
+---
+
+# ✅ SUMMARY TABLE
+
+| Environment | Workspace | tfvars file | State file path | S3 Object |
+|--------------|------------|--------------|------------------|
+| Dev | `dev` | `dev.tfvars` | `env:/dev/terraform.tfstate` | ✅ Created |
+| Staging | `staging` | `staging.tfvars` | `env:/staging/terraform.tfstate` | ✅ Created |
+| Prod | `prod` | `prod.tfvars` | `env:/prod/terraform.tfstate` | ✅ Created |
+
+---
+
+# 🏁 BONUS — Verify via CLI
+
+Show active workspace:
+
+```bash
+terraform workspace show
+```
+
+List S3 objects:
+
+```bash
+aws s3 ls s3://deepak-terraform-state/workspace-demo/env:/
+```
+---
 
 ### 5. Conditionally Create Resources
 - Use `count` or `for_each` to create resources based on conditions  
