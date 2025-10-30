@@ -1930,6 +1930,8 @@ prod-workspace-demo-zzzz
 
 Each environment’s state file is isolated within its own S3 folder (Terraform handles this automatically).
 
+<img width="1508" height="614" alt="image" src="https://github.com/user-attachments/assets/4f2bd458-54e8-4062-a776-a8b627ae205f" />
+
 ---
 
 # 🧠 STEP 9 — Modify & Destroy
