@@ -1272,6 +1272,9 @@ for_each = {
 5. Enable **Bucket Versioning** → ✅ (important for state recovery)
 6. Click **Create bucket**
 
+<img width="1508" height="789" alt="image" src="https://github.com/user-attachments/assets/2d570368-c1d0-4d7a-9337-3f6f1ca7411c" />
+
+
 ### 🔹 Terraform equivalent:
 
 ```hcl
@@ -1298,6 +1301,9 @@ resource "aws_s3_bucket_versioning" "tf_state_versioning" {
 3. Partition key → `LockID` (String)
 4. Leave everything else default
 5. Create table
+
+<img width="1508" height="789" alt="image" src="https://github.com/user-attachments/assets/82d4f929-259c-4c11-9020-bbf293119bb9" />
+
 
 ### 🔹 Terraform equivalent:
 
@@ -1454,6 +1460,241 @@ If you previously had DynamoDB locks:
 ```bash
 aws dynamodb delete-table --table-name terraform-locks
 ```
+
+
+> Let’s now **test** both setups — the **old (S3 + DynamoDB)** and **new (S3 native locking)** — step-by-step to verify state storage, locking, and behavior during concurrent operations.
+
+---
+
+# 🧪 TESTING — OLD WAY (S3 + DynamoDB)
+
+---
+
+## ✅ Prerequisites
+
+* Terraform ≥ v1.0
+* AWS CLI configured (`aws configure`)
+* S3 bucket + DynamoDB table already created
+* Backend configured in `main.tf`:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "deepak-terraform-state"
+    key            = "test/terraform.tfstate"
+    region         = "ap-south-1"
+    encrypt        = true
+    dynamodb_table = "terraform-locks"
+  }
+}
+
+provider "aws" {
+  region = "ap-south-1"
+}
+```
+
+---
+
+## 🧩 Step 1 — Initialize Backend
+
+```bash
+terraform init
+```
+
+✅ Expected output:
+
+```
+Initializing the backend...
+Successfully configured the backend "s3"!
+```
+
+---
+
+## 🧱 Step 2 — Create a Simple Resource to Test
+
+```hcl
+resource "aws_s3_bucket" "test_bucket" {
+  bucket = "deepak-tf-test-${random_id.id.hex}"
+}
+
+resource "random_id" "id" {
+  byte_length = 4
+}
+```
+
+---
+
+## ⚙️ Step 3 — Plan & Apply
+
+```bash
+terraform plan
+terraform apply -auto-approve
+```
+
+✅ Check:
+
+* S3 → Bucket `deepak-terraform-state` has `test/terraform.tfstate`
+* DynamoDB → Table `terraform-locks` has one active `LockID` during apply, then disappears after success.
+
+<img width="1508" height="614" alt="image" src="https://github.com/user-attachments/assets/3655eca4-6efb-44d0-9726-5fa92690970f" />
+
+<img width="1508" height="614" alt="image" src="https://github.com/user-attachments/assets/26dd4810-bcd5-42ec-a2d4-9570de06a4a1" />
+
+<img width="1508" height="614" alt="image" src="https://github.com/user-attachments/assets/fd293634-9b4d-4913-bf20-a940e8cee074" />
+
+
+
+---
+
+## 🧠 Step 4 — Simulate Locking (Concurrency Test)
+
+Try applying **at the same time** in two terminals.
+
+### Terminal 1:
+
+```bash
+terraform apply
+```
+
+→ Starts creating resource
+
+### Terminal 2 (while first is running):
+
+```bash
+terraform apply
+```
+
+❌ Expected output:
+
+```
+Error acquiring the state lock
+Lock info:
+  ID: <lock-id>
+  Path: test/terraform.tfstate
+```
+
+✅ Confirms **DynamoDB locking works**.
+
+---
+
+## 🧹 Step 5 — Clean Up
+
+```bash
+terraform destroy -auto-approve
+```
+
+---
+
+# 🧪 TESTING — NEW WAY (S3 NATIVE LOCKING, 2025+)
+
+---
+
+## ✅ Prerequisites
+
+* Terraform **v1.10+**
+* AWS CLI configured
+* Only S3 bucket needed
+* Backend configured as:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket       = "deepak-terraform-state"
+    key          = "test-native/terraform.tfstate"
+    region       = "ap-south-1"
+    encrypt      = true
+    use_lockfile = true   # ✅ native lock
+  }
+}
+
+provider "aws" {
+  region = "ap-south-1"
+}
+```
+
+---
+
+## 🧩 Step 1 — Initialize Backend
+
+```bash
+terraform init -reconfigure
+```
+
+✅ Expected output:
+
+```
+Backend configured with native S3 locking.
+```
+
+---
+
+## ⚙️ Step 2 — Apply Terraform
+
+```bash
+terraform apply -auto-approve
+```
+
+✅ Check:
+
+* S3 → `test-native/terraform.tfstate`
+* You’ll see a **temporary lock file** in S3 during apply:
+
+  ```
+  test-native/terraform.tfstate.lockfile
+  ```
+
+  It will disappear automatically after completion.
+
+---
+
+## 🧠 Step 3 — Test Concurrent Locking
+
+Try applying in two terminals again.
+
+### Terminal 1:
+
+```bash
+terraform apply
+```
+
+### Terminal 2:
+
+```bash
+terraform apply
+```
+
+❌ Expected output:
+
+```
+Error: State file is locked by another operation
+```
+
+✅ Confirms **native S3 lock works** (without DynamoDB).
+
+---
+
+## 🧹 Step 4 — Clean Up
+
+```bash
+terraform destroy -auto-approve
+```
+
+---
+
+# ✅ Verification Summary
+
+| Test                      | Old Way (S3 + DynamoDB) | New Way (S3 Native Locking) |
+| ------------------------- | ----------------------- | --------------------------- |
+| State File Stored in S3   | ✅                       | ✅                           |
+| Lock Created              | ✅ DynamoDB entry        | ✅ S3 `.lockfile`            |
+| Concurrent Apply Blocked  | ✅                       | ✅                           |
+| DynamoDB Required         | ✅                       | ❌                           |
+| Works on Terraform v1.10+ | ✅                       | ✅                           |
+| Simplicity                | ❌ Moderate              | ✅ Easier                    |
+
+---
+
+
 
 ---
 
