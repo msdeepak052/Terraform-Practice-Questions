@@ -1951,14 +1951,15 @@ Each destroys **only** its environment’s resources.
 
 # ✅ SUMMARY TABLE
 
-| Environment | Workspace | tfvars file | State file path | S3 Object |
 
-|--------------|------------|--------------|------------------|
-| Dev | `dev` | `dev.tfvars` | `env:/dev/terraform.tfstate` | ✅ Created |
-| Staging | `staging` | `staging.tfvars` | `env:/staging/terraform.tfstate` | ✅ Created |
-| Prod | `prod` | `prod.tfvars` | `env:/prod/terraform.tfstate` | ✅ Created |
+| **Environment** | **Workspace** | **tfvars file**  | **State file path**              | **S3 Object** |
+| --------------- | ------------- | ---------------- | -------------------------------- | ------------- |
+| Dev             | `dev`         | `dev.tfvars`     | `env:/dev/terraform.tfstate`     | ✅ Created     |
+| Staging         | `staging`     | `staging.tfvars` | `env:/staging/terraform.tfstate` | ✅ Created     |
+| Prod            | `prod`        | `prod.tfvars`    | `env:/prod/terraform.tfstate`    | ✅ Created     |
 
 ---
+
 
 # 🏁 BONUS — Verify via CLI
 
